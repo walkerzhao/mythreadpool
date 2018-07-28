@@ -14,3 +14,13 @@
 .idea/misc.xml
 
 .idea/modules.xml
+
+target/classes/com/tencent/App.class
+
+target/test-classes/com/tencent/AppTest.class
+
+mythreadpool.iml
+
+.idea/workspace.xml
+
+.idea/vcs.xml
