@@ -24,3 +24,7 @@ mythreadpool.iml
 .idea/workspace.xml
 
 .idea/vcs.xml
+
+target/classes/com/tencent/threadpool/impl/AbstractMyExecutorService.class
+
+*.class

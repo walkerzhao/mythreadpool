@@ -16,7 +16,14 @@ https://www.cnblogs.com/absfree/p/5357118.html
 * 任务队列:添加新任务/队列拒绝策略;
 
 ##  需求分析,实现的关键点
-* 定义线程状态;
+### 线程池的5种状态:https://blog.csdn.net/l_kanglin/article/details/57411851
+* 线程池的多个状态,状态之间的转换条件;
+
+### 重要的成员变量
+* corePoolSize:核心线程池的大小;
+* maximumPoolSize:最大线程池大小;
+* largestPoolSize: 线程池的最大记录,仅做记录使用.
+
 
 ##  实现问题记录,以及解决方案
 
