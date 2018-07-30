@@ -1,9 +1,9 @@
 package com.tencent.threadpool.impl;
 
+import com.tencent.threadpool.MyRejectedExecutionHandler;
+
 import java.util.HashSet;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.concurrent.locks.Condition;
@@ -89,6 +89,137 @@ public class MyThreadPoolExecutor extends  AbstractMyExecutorService {
     private volatile int corePoolSize;
     private volatile int maximumPoolSize;
     private int largestPoolSize;
+    private volatile MyRejectedExecutionHandler handler;
+
+    private static final RejectedExecutionHandler defaultHandler =
+            new AbortPolicy();
+
+    public static class AbortPolicy implements RejectedExecutionHandler {
+        /**
+         * Creates an {@code AbortPolicy}.
+         */
+        public AbortPolicy() { }
+
+        /**
+         * Always throws RejectedExecutionException.
+         *
+         * @param r the runnable task requested to be executed
+         * @param e the executor attempting to execute this task
+         * @throws RejectedExecutionException always
+         */
+        public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+            throw new RejectedExecutionException("Task " + r.toString() +
+                    " rejected from " +
+                    e.toString());
+        }
+    }
+
+    public MyThreadPoolExecutor(int corePoolSize,
+                              int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue<Runnable> workQueue) {
+        this(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue,
+                Executors.defaultThreadFactory(), defaultHandler);
+    }
+
+    public MyThreadPoolExecutor(int corePoolSize,
+                              int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue<Runnable> workQueue,
+                              ThreadFactory threadFactory) {
+        this(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue,
+                threadFactory, defaultHandler);
+    }
+
+    public MyThreadPoolExecutor(int corePoolSize,
+                              int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue<Runnable> workQueue,
+                              RejectedExecutionHandler handler) {
+        this(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue,
+                Executors.defaultThreadFactory(), handler);
+    }
+
+    public MyThreadPoolExecutor(int corePoolSize,
+                              int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue<Runnable> workQueue,
+                              ThreadFactory threadFactory,
+                              RejectedExecutionHandler handler) {
+        if (corePoolSize < 0 ||
+                maximumPoolSize <= 0 ||
+                maximumPoolSize < corePoolSize ||
+                keepAliveTime < 0)
+            throw new IllegalArgumentException();
+        if (workQueue == null || threadFactory == null || handler == null)
+            throw new NullPointerException();
+        this.corePoolSize = corePoolSize;
+        this.maximumPoolSize = maximumPoolSize;
+        this.workQueue = workQueue;
+        this.keepAliveTime = unit.toNanos(keepAliveTime);
+        this.threadFactory = threadFactory;
+    }
+
+
+        /**
+         * 提交任务
+         * @param command
+         */
+    public void execute(Runnable command) {
+        if (command == null)
+            throw new NullPointerException();
+        /*
+         * Proceed in 3 steps:
+         *
+         * 1. If fewer than corePoolSize threads are running, try to
+         * start a new thread with the given command as its first
+         * task.  The call to addWorker atomically checks runState and
+         * workerCount, and so prevents false alarms that would add
+         * threads when it shouldn't, by returning false.
+         *
+         * 2. If a task can be successfully queued, then we still need
+         * to double-check whether we should have added a thread
+         * (because existing ones died since last checking) or that
+         * the pool shut down since entry into this method. So we
+         * recheck state and if necessary roll back the enqueuing if
+         * stopped, or start a new thread if there are none.
+         *
+         * 3. If we cannot queue task, then we try to add a new
+         * thread.  If it fails, we know we are shut down or saturated
+         * and so reject the task.
+         */
+        int c = ctl.get();
+        if (workerCountOf(c) < corePoolSize) {
+            if (addWorker(command, true))
+                return;
+            c = ctl.get();
+        }
+        if (isRunning(c) && workQueue.offer(command)) {
+            int recheck = ctl.get();
+            if (! isRunning(recheck) && remove(command))
+                reject(command);
+            else if (workerCountOf(recheck) == 0)
+                addWorker(null, false);
+        }
+        else if (!addWorker(command, false))
+            reject(command);
+    }
+
+    public boolean remove(Runnable task) {
+        boolean removed = workQueue.remove(task);
+        tryTerminate(); // In case SHUTDOWN and now empty
+        return removed;
+    }
+
+    final void reject(Runnable command) {
+        handler.rejectedExecution(command, this);
+    }
+
+
 
     private final class Worker
             extends AbstractQueuedSynchronizer
@@ -399,7 +530,7 @@ public class MyThreadPoolExecutor extends  AbstractMyExecutorService {
         }
     }
 
-   
+
     private void addWorkerFailed(Worker w) {
         final ReentrantLock mainLock = this.mainLock;
         mainLock.lock();
@@ -408,6 +539,36 @@ public class MyThreadPoolExecutor extends  AbstractMyExecutorService {
                 workers.remove(w);
             decrementWorkerCount();
             tryTerminate();
+        } finally {
+            mainLock.unlock();
+        }
+    }
+
+    public int getPoolSize() {
+        final ReentrantLock mainLock = this.mainLock;
+        mainLock.lock();
+        try {
+            // Remove rare and surprising possibility of
+            // isTerminated() && getPoolSize() > 0
+            return runStateAtLeast(ctl.get(), TIDYING) ? 0
+                    : workers.size();
+        } finally {
+            mainLock.unlock();
+        }
+    }
+
+    public BlockingQueue<Runnable> getQueue() {
+        return workQueue;
+    }
+
+    public long getCompletedTaskCount() {
+        final ReentrantLock mainLock = this.mainLock;
+        mainLock.lock();
+        try {
+            long n = completedTaskCount;
+            for (Worker w : workers)
+                n += w.completedTasks;
+            return n;
         } finally {
             mainLock.unlock();
         }
