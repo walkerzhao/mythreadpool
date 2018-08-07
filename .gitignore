@@ -28,3 +28,5 @@ mythreadpool.iml
 target/classes/com/tencent/threadpool/impl/AbstractMyExecutorService.class
 
 *.class
+
+.stack.txt.swp
