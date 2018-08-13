@@ -88,10 +88,16 @@ FAQ:
 * 避免反复创建线程对象,带来的性能开销(创建线程/销毁线程),节省系统的资源;
 * 当然是线程框架使用起来更加便捷.
 
-## 何为线程切换开销?
+## 何为线程切换开销? 为什么线程越多,切换开销越大?
+先看看java线程的状态,以及状态之间的转移图:
+https://juejin.im/post/5a72d4bd518825735300f37b
+
+https://www.cnblogs.com/EthanCai/p/3705834.html.
+上下文切换会带来直接和间接两种因素影响程序性能的消耗. 直接消耗包括: CPU寄存器需要保存和加载, 系统调度器的代码需要执行, TLB实例需要重新加载, CPU 的pipeline需要刷掉; 间接消耗指的是多核的cache之间得共享数据, 间接消耗对于程序的影响要看线程工作区操作数据的大小
 
 
-## 线程池中用到了哪些设计模式??
+## 线程池中用到了哪些设计模式??.
+
 * 代理模式:https://www.cnblogs.com/ChaosJu/p/4531795.html   是Thread代理了具体的任务,执行的时候,添加了具体的逻辑.
 * 命令模式:https://blog.csdn.net/zerohuan/article/details/50039005   将任务封装成一个个的任务命令,提交到任务队列中,获取到执行结果.
 * 工厂模式:ThreadFactory,线程工厂.
@@ -104,3 +110,13 @@ FAQ:
 ## 线程池实现的类图大概是什么样子的?
 * Executor/abstractExecutor/ThreadPoolExecutor/ScheduledThreadPoolExecutor/Executors,主要是这几个类
 
+
+## synchronized和ReentrantLock的区别
+
+
+## ReadWriteLock是什么
+
+
+## 什么是AQS
+
+## Semaphore有什么作用
